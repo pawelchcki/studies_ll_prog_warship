@@ -2,58 +2,33 @@
 #include<ncurses.h>
 #include<malloc.h>
 #include<assert.h>
+#include<stdlib.h>
+#include"translation.h"
+#include"board.h"
 
-enum FieldValues {
-    EMPTY = 0,
-    SHIP  = 1 << 0,
-    SHOT  = 1 << 1
-};
-
-typedef unsigned char cell_t;
-
-typedef struct {
-    cell_t **player_a;
-    cell_t **player_b;
-    size_t length;
-} board_t;
-
-cell_t** new_battlefield(int length){
-    cell_t **rv = malloc(length*sizeof(cell_t));
-    for(int i=0; i<length; i++){
-        rv[i] = calloc(length, sizeof(cell_t));
-    }
-    return rv;
-}
-
-board_t* new_board(size_t length) {
-    board_t *board = malloc(sizeof(board_t));
-    board->player_a = new_battlefield(length);
-    board->player_b = new_battlefield(length);
-    board->length = length;
-    return board;
-}
-
-void free_board(board_t *board){
-    for (int i=0; i<board->length; i++){
-        free(board->player_a[i]);
-        free(board->player_b[i]);
-    }
-    free(board->player_a);
-    free(board->player_b);
-    free(board);
-}
-
-void draw_cell(int x, int y, cell_t cell){
+void draw_cell(int y, int x, cell_t cell, bool anonymous){
     char ch;
+    if (anonymous && cell == (SHIP | !SHOT)){
+        draw_cell(y, x, EMPTY, anonymous);
+    }
     switch (cell){
     case EMPTY:
         ch='_';
         break;
     case SHIP | SHOT:
-            ch='@';
-            break;
-    case SHIP:
-        ch='#';
+        ch='@';
+        break;
+    case SHIP_ONE:
+        ch='1';
+        break;
+    case SHIP_TWO:
+        ch='2';
+        break;
+    case SHIP_THREE:
+        ch='3';
+        break;
+    case SHIP_FOUR:
+        ch='4';
         break;
     case SHOT:
         ch='+';
@@ -63,20 +38,39 @@ void draw_cell(int x, int y, cell_t cell){
         break;
     }
 
+
     mvaddch(y,x, ch);
 }
 
-void show(int x, int y, cell_t** field, size_t length){
+void show_single(int y, int x, cell_t** field, size_t length, bool anonymous){
     int start_x = getcurx(stdscr);
     int start_y = getcury(stdscr);
     move(y, x);
 
     for(int i=0; i<length; i++){
         for (int j=0; j<length; j++){
-            draw_cell(x+i,y+j, (field[i])[j]);
+            draw_cell(y+j, x+i*2, (field[i])[j], anonymous);
         }
     }
     move(start_y, start_x);
+}
+
+void show_board(int y, int x, board_t* board) {
+    show_single(y, x, board->player_a, board->length, true);
+    show_single(y, x+ board->length*2 + BOARD_SPACING, board->player_b, board->length, true);
+}
+
+
+void place(int y, int x, int y_offset, int x_offset, board_t* board){
+    if (fits){
+        if (player_a){
+            board->player_a[translated_x][translated_y] = SHIP_ONE;
+//            mvaddch(translated_y, translated_x*2, 'D');
+        } else{
+            board->player_b[translated_x][translated_y] = SHIP_ONE;
+//            mvaddch(translated_y, translated_x*2 + board->length*2 + BOARD_SPACING, 'D');
+        }
+    }
 }
 
 int main(void)
@@ -85,14 +79,9 @@ int main(void)
     noecho();
     keypad(stdscr,TRUE);
     refresh();
-    int ch = getch();
+    int ch;// = getch();
     int x=0, y=0;
     board_t *board = new_board(10);
-
-    for (int i=0; i< 10; i++){
-        printf("%d\n", board->player_a[i][i]);
-        assert(board->player_a[i][i] == 0);
-    }
 
     while (ch != 'q'){
         switch(ch) {
@@ -100,8 +89,9 @@ int main(void)
             case KEY_RIGHT: x++; break;
             case KEY_UP: y--; break;
             case KEY_DOWN: y++; break;
+        case 'p': place(y,x,0,0, board);
             default:
-            show(10, 10, board->player_a, 10);
+            show_board(0, 0, board);
 
         }
 
