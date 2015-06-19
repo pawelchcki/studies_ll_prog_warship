@@ -29,8 +29,8 @@ coords_t translate_coords(int y, int x, int y_offset, int x_offset, board_t* boa
     }
 
     int translated_y = y - y_offset;
-    coords_t rv = { .x = translated_x,
-                    .y = translated_y,
+    coords_t rv = { .x = translated_x % board->length,
+                    .y = translated_y % board->length,
                     .fits = fits,
                     .player_a = player_a,
                     .x_origin = x,

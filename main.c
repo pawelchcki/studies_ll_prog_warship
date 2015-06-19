@@ -5,6 +5,7 @@
 #include<stdlib.h>
 #include"translation.h"
 #include"board.h"
+#include <assert.h>
 
 void draw_cell(int y, int x, cell_t cell, bool anonymous){
     char ch;
@@ -61,20 +62,160 @@ void show_board(int y, int x, board_t* board) {
 }
 
 
+// 3b 20 czerwca sobota
+bool check_neighbor(int y, int x, coords_t *c, cell_t **player, int board_len){
+    int x_n = c->x + x;
+    int y_n = c->y + y;
+    if (x_n < 0 || y_n < 0 || x_n >= board_len || y_n >= board_len){
+        return false;
+    }
+
+    if (player[x_n][y_n] & SHIP){
+        return true;
+    } else {
+        return false;
+    }
+}
+
+bool check_valid_ship(int y, int x, int y_dir, int x_dir, int *ship_len, cell_t **player, int board_len){
+    if (*ship_len > 4) {
+        return false;
+    }
+
+    if (x >= 0 && y >= 0 && x < board_len && y < board_len){
+        if (player[x][y] & SHIP){
+            *ship_len += 1;
+            return check_valid_ship(y + y_dir, x + x_dir, y_dir, x_dir, ship_len, player, board_len);
+        }
+    }
+    return true;
+}
+
+bool is_allowed(coords_t *c, cell_t **player, int board_len){
+    int neighbors=0;
+    //nidozwoleni
+    if (check_neighbor(-1, -1, c, player, board_len) || check_neighbor(1, 1, c, player, board_len) || check_neighbor(-1, 1, c, player, board_len) || check_neighbor(1, -1, c, player, board_len)){
+        return false;
+    }
+    int x_last_neigh, y_last_neigh;
+    int allowed_neighboars[4][2] = {{-1,0}, {0,-1}, {1, 0},{0,1}};
+    for(int i=0; i < 4; i++){
+        if (check_neighbor(allowed_neighboars[i][0], allowed_neighboars[i][1], c, player, board_len)){
+            neighbors += 1;
+            y_last_neigh = allowed_neighboars[i][0];
+            x_last_neigh = allowed_neighboars[i][1];
+        }
+    }
+
+    if (neighbors > 1){
+        return false;
+    } else if (neighbors == 1){
+        int ship_len = 1;
+        return check_valid_ship(c->y + y_last_neigh, c->x + x_last_neigh, y_last_neigh, x_last_neigh, &ship_len, player, board_len);
+
+    }
+    return true;
+}
+
+
+
+void test_is_alowed(){
+    coords_t c;
+    c.fits = true;
+    c.player_a = true;
+    c.x = 0;
+    c.y = 1;
+    {
+        int size = 5;
+        BATTLEFIELD(max_len, ARR({{EMPTY,SHIP,SHIP,SHIP,SHIP},{0,0,0,0,0},{0,0,0,0,0},{0,0,0,0,0},{0,0,0,0,0}}), 5)
+        c.x = 0;
+        c.y = 0;
+        assert(is_allowed(&c, max_len_bf, size) == false);
+        free_battlefield(max_len_bf, size);
+    }
+    {
+        int size = 2;
+        BATTLEFIELD(simple, ARR({{SHIP,EMPTY}, {EMPTY,EMPTY}}), 2)
+        assert(is_allowed(&c, simple_bf, size) == true);
+        c.x=1;
+        c.y=0;
+        assert(is_allowed(&c, simple_bf, size) == true);
+        simple_bf[0][1] |= SHIP;
+        assert(is_allowed(&c, simple_bf, size) == false);
+        free_battlefield(simple_bf, size);
+    }
+
+}
+
+void get_direction(int y, int x, int *y_dir, int *x_dir, cell_t **player, int board_len){
+    int dirs[4][2] = {{-1,0}, {0,-1}, {1, 0},{0,1}};
+    for(int i=0; i < 4; i++){
+        *y_dir = dirs[i][0];
+        *x_dir = dirs[i][1];
+        x += *x_dir;
+        y += *y_dir;
+        if (x >= 0 && y >= 0 && x < board_len && y < board_len){
+            if (player[x][y] & SHIP){
+                return;
+            }
+        }
+    }
+    *y_dir = 0;
+    *x_dir = 0;
+}
+
+
+void replace(int y, int x, int y_dir, int x_dir, cell_t **player, int board_len, cell_t ship){
+    int ignore;
+    if (check_valid_ship(y, x, y_dir, x_dir, &ignore, player, board_len)){
+      player[x][y] |= ship;
+      replace(y+y_dir, x+x_dir, y_dir, x_dir, player, board_len, ship);
+    }
+}
+
+cell_t len_to_ship(int len){
+    switch(len){
+    case 1: return SHIP_ONE;
+    case 2: return SHIP_TWO;
+    case 3: return SHIP_THREE;
+    case 4: return SHIP_FOUR;
+    }
+    return SHIP;
+}
+
+
+void start_replace(int y, int x, cell_t **player, int board_len){
+
+    player[x][y] |= SHIP_ONE;
+//    int ship_len = 1;
+//    int x_dir, y_dir;
+//    get_direction(y, x, &y_dir, &x_dir, player, board_len);
+//    if (check_valid_ship(y+y_dir, x+x_dir, y_dir, x_dir, &ship_len, player, board_len)){
+//        replace(y+y_dir, x+x_dir, y_dir, x_dir, player, board_len, len_to_ship(ship_len));
+//    }
+}
+
 void place(int y, int x, int y_offset, int x_offset, board_t* board){
-    if (fits){
-        if (player_a){
-            board->player_a[translated_x][translated_y] = SHIP_ONE;
-//            mvaddch(translated_y, translated_x*2, 'D');
+    coords_t coords = translate_coords(y,x, y_offset, x_offset, board);
+    if (coords.fits){
+        if (coords.player_a){
+            if (is_allowed(&coords, board->player_a, board->length)){
+
+                start_replace(coords.y, coords.x, board->player_a,board->length);
+            }
+//                board->player_a[coords.x][coords.y] = SHIP_ONE;
         } else{
-            board->player_b[translated_x][translated_y] = SHIP_ONE;
-//            mvaddch(translated_y, translated_x*2 + board->length*2 + BOARD_SPACING, 'D');
+            if (is_allowed(&coords, board->player_b, board->length)){
+                start_replace(coords.y, coords.x, board->player_b,board->length);
+            }
+//                board->player_b[coords.x][coords.y] = SHIP_ONE;
         }
     }
 }
 
 int main(void)
 {
+    test_is_alowed();
     initscr();
     noecho();
     keypad(stdscr,TRUE);
