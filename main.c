@@ -85,7 +85,11 @@ bool check_valid_ship(int y, int x, int y_dir, int x_dir, int *ship_len, cell_t 
     if (x >= 0 && y >= 0 && x < board_len && y < board_len){
         if (player[x][y] & SHIP){
             *ship_len += 1;
-            return check_valid_ship(y + y_dir, x + x_dir, y_dir, x_dir, ship_len, player, board_len);
+            if (y_dir == 0 && x_dir == 0) {
+                return true;
+            } else {
+                return check_valid_ship(y + y_dir, x + x_dir, y_dir, x_dir, ship_len, player, board_len);
+            }
         }
     }
     return true;
@@ -93,7 +97,7 @@ bool check_valid_ship(int y, int x, int y_dir, int x_dir, int *ship_len, cell_t 
 
 bool is_allowed(coords_t *c, cell_t **player, int board_len){
     int neighbors=0;
-    //nidozwoleni
+    //niedozwoleni
     if (check_neighbor(-1, -1, c, player, board_len) || check_neighbor(1, 1, c, player, board_len) || check_neighbor(-1, 1, c, player, board_len) || check_neighbor(1, -1, c, player, board_len)){
         return false;
     }
@@ -147,15 +151,15 @@ void test_is_alowed(){
 
 }
 
-void get_direction(int y, int x, int *y_dir, int *x_dir, cell_t **player, int board_len){
+void get_direction(int sy, int sx, int *y_dir, int *x_dir, cell_t **player, int board_len){
     int dirs[4][2] = {{-1,0}, {0,-1}, {1, 0},{0,1}};
     for(int i=0; i < 4; i++){
         *y_dir = dirs[i][0];
         *x_dir = dirs[i][1];
-        x += *x_dir;
-        y += *y_dir;
+        int x = sx + *x_dir;
+        int y = sy + *y_dir;
         if (x >= 0 && y >= 0 && x < board_len && y < board_len){
-            if (player[x][y] & SHIP){
+            if ((player[x][y] & SHIP) == SHIP){
                 return;
             }
         }
@@ -166,10 +170,12 @@ void get_direction(int y, int x, int *y_dir, int *x_dir, cell_t **player, int bo
 
 
 void replace(int y, int x, int y_dir, int x_dir, cell_t **player, int board_len, cell_t ship){
-    int ignore;
-    if (check_valid_ship(y, x, y_dir, x_dir, &ignore, player, board_len)){
+    if ((player[x][y] & SHIP)
+     && (y < board_len && x < board_len && y >=0 && x >= 0)){
       player[x][y] |= ship;
-      replace(y+y_dir, x+x_dir, y_dir, x_dir, player, board_len, ship);
+      if (y_dir != 0 || x_dir != 0){
+        replace(y+y_dir, x+x_dir, y_dir, x_dir, player, board_len, ship);
+      }
     }
 }
 
@@ -187,12 +193,14 @@ cell_t len_to_ship(int len){
 void start_replace(int y, int x, cell_t **player, int board_len){
 
     player[x][y] |= SHIP_ONE;
-//    int ship_len = 1;
-//    int x_dir, y_dir;
-//    get_direction(y, x, &y_dir, &x_dir, player, board_len);
-//    if (check_valid_ship(y+y_dir, x+x_dir, y_dir, x_dir, &ship_len, player, board_len)){
-//        replace(y+y_dir, x+x_dir, y_dir, x_dir, player, board_len, len_to_ship(ship_len));
-//    }
+    int ship_len = 0;
+    int x_dir, y_dir;
+    get_direction(y, x, &y_dir, &x_dir, player, board_len);
+    if (check_valid_ship(y, x, y_dir, x_dir, &ship_len, player, board_len)){
+        replace(y, x, y_dir, x_dir, player, board_len, len_to_ship(ship_len));
+    } else {
+        player[x][y] ^= SHIP_ONE;
+    }
 }
 
 void place(int y, int x, int y_offset, int x_offset, board_t* board){
@@ -200,15 +208,13 @@ void place(int y, int x, int y_offset, int x_offset, board_t* board){
     if (coords.fits){
         if (coords.player_a){
             if (is_allowed(&coords, board->player_a, board->length)){
-
                 start_replace(coords.y, coords.x, board->player_a,board->length);
             }
-//                board->player_a[coords.x][coords.y] = SHIP_ONE;
+
         } else{
             if (is_allowed(&coords, board->player_b, board->length)){
                 start_replace(coords.y, coords.x, board->player_b,board->length);
             }
-//                board->player_b[coords.x][coords.y] = SHIP_ONE;
         }
     }
 }
