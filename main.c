@@ -6,6 +6,7 @@
 #include"translation.h"
 #include"board.h"
 #include <assert.h>
+#include <string.h>
 
 void draw_cell(int y, int x, cell_t cell, bool anonymous){
     char ch;
@@ -170,9 +171,8 @@ void get_direction(int sy, int sx, int *y_dir, int *x_dir, cell_t **player, int 
 
 
 void replace(int y, int x, int y_dir, int x_dir, cell_t **player, int board_len, cell_t ship){
-    if ((player[x][y] & SHIP)
-     && (y < board_len && x < board_len && y >=0 && x >= 0)){
-      player[x][y] |= ship;
+    if ((y < board_len && x < board_len && y >=0 && x >= 0) && (player[x][y] & SHIP)==SHIP){
+      player[x][y] = ship;
       if (y_dir != 0 || x_dir != 0){
         replace(y+y_dir, x+x_dir, y_dir, x_dir, player, board_len, ship);
       }
@@ -191,30 +191,92 @@ cell_t len_to_ship(int len){
 
 
 void start_replace(int y, int x, cell_t **player, int board_len){
-
-    player[x][y] |= SHIP_ONE;
+    player[x][y] |= SHIP;
     int ship_len = 0;
     int x_dir, y_dir;
     get_direction(y, x, &y_dir, &x_dir, player, board_len);
     if (check_valid_ship(y, x, y_dir, x_dir, &ship_len, player, board_len)){
         replace(y, x, y_dir, x_dir, player, board_len, len_to_ship(ship_len));
     } else {
-        player[x][y] ^= SHIP_ONE;
+        player[x][y] ^= SHIP;
     }
+}
+
+
+void remove_at(int y, int x, int y_offset, int x_offset, board_t* board){
+    coords_t coords = translate_coords(y,x, y_offset, x_offset, board);
+    if (coords.fits){
+        cell_t **battlefield;
+        if (coords.player_a){
+            battlefield = board->player_a;
+        } else{
+            battlefield = board->player_b;
+        }
+        if (battlefield[coords.x][coords.y] & SHIP){
+            int y_dir = 0, x_dir =0;
+            battlefield[coords.x][coords.y] = EMPTY;
+            for(int i=0; i<4; i++){
+                get_direction(coords.y, coords.x, &y_dir, &x_dir, battlefield, board->length);
+                if (y_dir == 0 && x_dir == 0){
+                    break;
+                } else {
+                    replace(coords.y+y_dir, coords.x+x_dir, y_dir, x_dir, battlefield, board->length, EMPTY);
+                }
+            }
+        }
+    }
+}
+
+int* count_ships(cell_t** battlefield, size_t length){
+    int* counts;
+    counts  = malloc(255 * sizeof(*counts));
+    memset(counts, 0, 255);
+    for(int i = 0; i< length; i++ ){
+        for(int j = 0; j< length; j++){
+            cell_t ship = battlefield[i][j];
+            if (ship & SHIP_FOUR){
+                counts[SHIP_FOUR] += 1;
+            } else if (ship & SHIP_THREE){
+                counts[SHIP_THREE] += 1;
+            } else if (ship & SHIP_TWO){
+                counts[SHIP_TWO] += 1;
+            } else if (ship & SHIP_ONE){
+                counts[SHIP_ONE] += 1;
+            }
+        }
+    }
+    counts[SHIP_FOUR] /= 4;
+    counts[SHIP_THREE] /= 3;
+    counts[SHIP_TWO] /= 2;
+    return counts;
+}
+
+bool obeys_limits(cell_t** battlefield, size_t length){
+//     jedna „czwórka”, dwie „trójki”, trzy „dwójki”, cztery „jedynki”
+    int *counts = count_ships(battlefield, length);
+    bool rv = counts[SHIP_FOUR] < 2 && counts[SHIP_THREE] < 3 && counts[SHIP_TWO] < 4 && counts[SHIP_ONE] < 1;
+    free(counts);
+    return rv;
+}
+
+bool finished(cell_t** battlefield, size_t length){
+    int *counts = count_ships(battlefield, length);
+    bool rv = counts[SHIP_FOUR] == 1 && counts[SHIP_THREE] == 2 && counts[SHIP_TWO] == 3 && counts[SHIP_ONE] == 4;
+    free(counts);
+    return rv;
 }
 
 void place(int y, int x, int y_offset, int x_offset, board_t* board){
     coords_t coords = translate_coords(y,x, y_offset, x_offset, board);
     if (coords.fits){
+        cell_t **battlefield;
         if (coords.player_a){
-            if (is_allowed(&coords, board->player_a, board->length)){
-                start_replace(coords.y, coords.x, board->player_a,board->length);
-            }
-
+            battlefield = board->player_a;
         } else{
-            if (is_allowed(&coords, board->player_b, board->length)){
-                start_replace(coords.y, coords.x, board->player_b,board->length);
-            }
+            battlefield = board->player_b;
+        }
+        if (is_allowed(&coords, battlefield, board->length)){
+            start_replace(coords.y, coords.x, battlefield, board->length);
         }
     }
 }
@@ -236,11 +298,13 @@ int main(void)
             case KEY_RIGHT: x++; break;
             case KEY_UP: y--; break;
             case KEY_DOWN: y++; break;
-        case 'p': place(y,x,0,0, board);
+        case 'x': remove_at(y,x,0,0, board); break;
+        case 'p': place(y,x,0,0, board); break;
             default:
             show_board(0, 0, board);
 
         }
+        show_board(0, 0, board);
 
         move(y,x);
 //        printw("Hello World !!!");
