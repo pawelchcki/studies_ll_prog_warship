@@ -10,8 +10,9 @@
 
 void draw_cell(int y, int x, cell_t cell, bool anonymous){
     char ch;
-    if (anonymous && cell == (SHIP | !SHOT)){
-        draw_cell(y, x, EMPTY, anonymous);
+    if (anonymous && !(cell & SHOT)){
+        cell = EMPTY;
+//        draw_cell(y, x, EMPTY, anonymous);
     }
     switch (cell){
     case EMPTY:
@@ -59,7 +60,7 @@ void show_single(int y, int x, cell_t** field, size_t length, bool anonymous){
 
 void show_board(int y, int x, board_t* board, bool turn_a) {
     show_single(y, x, board->player_a, board->length, turn_a);
-    show_single(y, x+ board->length*2 + BOARD_SPACING, board->player_b, board->length, turn_a);
+    show_single(y, x+ board->length*2 + BOARD_SPACING, board->player_b, board->length, !turn_a);
 }
 
 
@@ -111,21 +112,25 @@ void place(int y, int x, int y_offset, int x_offset, board_t* board){
     }
 }
 
+void shoot(int y, int x, int y_offset, int x_offset, board_t* board, bool turn_a){
+    coords_t coords = translate_coords(y,x, y_offset, x_offset, board);
+    if (coords.fits && (turn_a == coords.player_a)){
+        cell_t **battlefield;
+        if (coords.player_a){
+            battlefield = board->player_a;
+        } else {
+            battlefield = board->player_b;
+        }
+        battlefield[coords.x][coords.y] |= SHOT;
+
+    }
+}
+
 
 void dumb_fill(cell_t **battlefield, size_t board_len){
     srand(time(NULL));
     int max_iter= 1000000;
     while(obeys_limits(battlefield, board_len) && max_iter > 0){
-//        for(int i=0; i<board_len; i++){
-//            for(int j=0; j<board_len; j++){
-//                if (rand() % 10 > 2){
-//                    if (try_obeys(i, j, battlefield, board_len)){
-//                        start_replace(i, j, battlefield, board_len);
-//                    }
-//                }
-//            }
-//        }
-
         int x = rand() % board_len;
         int y = rand() % board_len;
         if (is_allowed(y, x, battlefield, board_len) &&try_obeys(y,x, battlefield, board_len)){
@@ -133,8 +138,6 @@ void dumb_fill(cell_t **battlefield, size_t board_len){
         }
         max_iter-=1;
     }
-
-//    while(!final_state(battlefield, board_len))
 }
 
 int main(void)
@@ -157,6 +160,7 @@ int main(void)
             case KEY_DOWN: y++; break;
             case 'x': remove_at(y,x,0,0, board); break;
         case 't': turn_a = !turn_a ; break;
+        case 's': shoot(y,x,0,0, board, turn_a); break;
         case 'r': dumb_fill(board->player_b, board->length);break;
             case 'p': place(y,x,0,0, board); break;
             default:
