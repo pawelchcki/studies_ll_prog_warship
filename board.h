@@ -40,5 +40,7 @@ cell_t** new_battlefield(int length);
 board_t* new_board(size_t length);
 void free_board(board_t *board);
 void free_battlefield(cell_t **battlefield, size_t length);
+void get_direction(int sy, int sx, int *y_dir, int *x_dir, cell_t **player, int board_len);
+int* count_ships(cell_t** battlefield, size_t length);
 
 #endif
