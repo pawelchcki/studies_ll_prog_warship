@@ -57,16 +57,16 @@ void show_single(int y, int x, cell_t** field, size_t length, bool anonymous){
     move(start_y, start_x);
 }
 
-void show_board(int y, int x, board_t* board) {
-    show_single(y, x, board->player_a, board->length, true);
-    show_single(y, x+ board->length*2 + BOARD_SPACING, board->player_b, board->length, true);
+void show_board(int y, int x, board_t* board, bool turn_a) {
+    show_single(y, x, board->player_a, board->length, turn_a);
+    show_single(y, x+ board->length*2 + BOARD_SPACING, board->player_b, board->length, turn_a);
 }
 
 
 bool obeys_limits(cell_t** battlefield, size_t length){
 //     jedna „czwórka”, dwie „trójki”, trzy „dwójki”, cztery „jedynki”
     int *counts = count_ships(battlefield, length);
-    bool rv = counts[SHIP_FOUR] < 2 && counts[SHIP_THREE] < 3 && counts[SHIP_TWO] < 4 && counts[SHIP_ONE] < 1;
+    bool rv = counts[SHIP_FOUR] < 2 && counts[SHIP_THREE] < 3 && counts[SHIP_TWO] < 4 && counts[SHIP_ONE] < 5;
     free(counts);
     return rv;
 }
@@ -75,6 +75,24 @@ bool final_state(cell_t** battlefield, size_t length){
     int *counts = count_ships(battlefield, length);
     bool rv = counts[SHIP_FOUR] == 1 && counts[SHIP_THREE] == 2 && counts[SHIP_TWO] == 3 && counts[SHIP_ONE] == 4;
     free(counts);
+    return rv;
+}
+
+
+cell_t **clone_battlefield(cell_t **battlefield, int board_len){
+    cell_t **rv = new_battlefield(board_len);
+    for(int i=0; i<board_len; i++)
+        for(int j=0; j<board_len; j++){
+            rv[i][j] = battlefield[i][j];
+        }
+    return rv;
+}
+
+bool try_obeys(int y, int x, cell_t **battlefield, int board_len){
+    cell_t** clone = clone_battlefield(battlefield, board_len);
+    start_replace(y,x, clone, board_len);
+    bool rv = obeys_limits(clone, board_len);
+    free_battlefield(clone, board_len);
     return rv;
 }
 
@@ -87,7 +105,7 @@ void place(int y, int x, int y_offset, int x_offset, board_t* board){
         } else{
             battlefield = board->player_b;
         }
-        if (is_allowed(coords.y, coords.x, battlefield, board->length)){
+        if (is_allowed(coords.y, coords.x, battlefield, board->length) && try_obeys(coords.y, coords.x,battlefield, board->length)){
             start_replace(coords.y, coords.x, battlefield, board->length);
         }
     }
@@ -96,10 +114,27 @@ void place(int y, int x, int y_offset, int x_offset, board_t* board){
 
 void dumb_fill(cell_t **battlefield, size_t board_len){
     srand(time(NULL));
-    while(!final_state(battlefield, board_len)){
+    int max_iter= 1000000;
+    while(obeys_limits(battlefield, board_len) && max_iter > 0){
+//        for(int i=0; i<board_len; i++){
+//            for(int j=0; j<board_len; j++){
+//                if (rand() % 10 > 2){
+//                    if (try_obeys(i, j, battlefield, board_len)){
+//                        start_replace(i, j, battlefield, board_len);
+//                    }
+//                }
+//            }
+//        }
+
         int x = rand() % board_len;
         int y = rand() % board_len;
+        if (is_allowed(y, x, battlefield, board_len) &&try_obeys(y,x, battlefield, board_len)){
+            start_replace(y, x, battlefield, board_len);
+        }
+        max_iter-=1;
     }
+
+//    while(!final_state(battlefield, board_len))
 }
 
 int main(void)
@@ -112,6 +147,7 @@ int main(void)
     int ch;// = getch();
     int x=0, y=0;
     board_t *board = new_board(10);
+    bool turn_a = true;
 
     while (ch != 'q'){
         switch(ch) {
@@ -119,13 +155,16 @@ int main(void)
             case KEY_RIGHT: x++; break;
             case KEY_UP: y--; break;
             case KEY_DOWN: y++; break;
-        case 'x': remove_at(y,x,0,0, board); break;
-        case 'p': place(y,x,0,0, board); break;
+            case 'x': remove_at(y,x,0,0, board); break;
+        case 't': turn_a = !turn_a ; break;
+        case 'r': dumb_fill(board->player_b, board->length);break;
+            case 'p': place(y,x,0,0, board); break;
             default:
-            show_board(0, 0, board);
+            show_board(0, 0, board, turn_a);
+
 
         }
-        show_board(0, 0, board);
+        show_board(0, 0, board, turn_a);
 
         move(y,x);
 //        printw("Hello World !!!");

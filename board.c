@@ -71,13 +71,13 @@ int* count_ships(cell_t** battlefield, size_t length){
     for(int i = 0; i< length; i++ ){
         for(int j = 0; j< length; j++){
             cell_t ship = battlefield[i][j];
-            if (ship & SHIP_FOUR){
+            if (ship == SHIP_FOUR){
                 counts[SHIP_FOUR] += 1;
-            } else if (ship & SHIP_THREE){
+            } else if (ship  == SHIP_THREE){
                 counts[SHIP_THREE] += 1;
-            } else if (ship & SHIP_TWO){
+            } else if (ship == SHIP_TWO){
                 counts[SHIP_TWO] += 1;
-            } else if (ship & SHIP_ONE){
+            } else if (ship == SHIP_ONE){
                 counts[SHIP_ONE] += 1;
             }
         }
