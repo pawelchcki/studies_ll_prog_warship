@@ -87,7 +87,7 @@ void place(int y, int x, int y_offset, int x_offset, board_t* board){
         } else{
             battlefield = board->player_b;
         }
-        if (is_allowed(&coords, battlefield, board->length)){
+        if (is_allowed(coords.y, coords.x, battlefield, board->length)){
             start_replace(coords.y, coords.x, battlefield, board->length);
         }
     }
