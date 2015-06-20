@@ -7,6 +7,7 @@
 #include"board.h"
 #include <assert.h>
 #include <string.h>
+#include <time.h>
 
 void draw_cell(int y, int x, cell_t cell, bool anonymous){
     char ch;
@@ -259,7 +260,7 @@ bool obeys_limits(cell_t** battlefield, size_t length){
     return rv;
 }
 
-bool finished(cell_t** battlefield, size_t length){
+bool final_state(cell_t** battlefield, size_t length){
     int *counts = count_ships(battlefield, length);
     bool rv = counts[SHIP_FOUR] == 1 && counts[SHIP_THREE] == 2 && counts[SHIP_TWO] == 3 && counts[SHIP_ONE] == 4;
     free(counts);
@@ -278,6 +279,15 @@ void place(int y, int x, int y_offset, int x_offset, board_t* board){
         if (is_allowed(&coords, battlefield, board->length)){
             start_replace(coords.y, coords.x, battlefield, board->length);
         }
+    }
+}
+
+
+void dumb_fill(cell_t **battlefield, size_t board_len){
+    srand(time(NULL));
+    while(!final_state(battlefield, board_len)){
+        int x = rand() % board_len;
+        int y = rand() % board_len;
     }
 }
 
